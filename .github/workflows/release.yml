@@ -1,0 +1,92 @@
+# release.yml — 打 tag 时交叉编译各平台 wb2api 二进制并发布到 GitHub Releases。
+# 渠道判定:严格的 SemVer(v1.2.3)= stable;其他 v* tag(如 v202609192001-a767465)= canary,标 prerelease。
+# GitHub 的 releases/latest 跳过 prerelease,所以 latest 天然指向 stable。
+# 产物命名 wb2api-<os>-<arch>(Windows 带 .exe),附 SHA256SUMS 供客户端校验。
+# switch 侧把 update_source 指到对应 release 即可复用既有升级机制。
+name: Release Binaries
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+            name: wb2api-darwin-arm64
+          - goos: darwin
+            goarch: amd64
+            name: wb2api-darwin-amd64
+          - goos: windows
+            goarch: amd64
+            name: wb2api-windows-amd64.exe
+          - goos: linux
+            goarch: amd64
+            name: wb2api-linux-amd64
+          - goos: linux
+            goarch: arm64
+            name: wb2api-linux-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Cross-compile
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          go build -trimpath \
+            -ldflags "-s -w -X workbuddy2api/internal/server.version=${{ github.ref_name }}" \
+            -o "${{ matrix.name }}" ./cmd/server
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.name }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS
+        run: |
+          cd artifacts
+          shasum -a 256 * > SHA256SUMS
+          ls -lh
+
+      - name: Detect release type
+        id: type
+        run: |
+          if echo "$GITHUB_REF_NAME" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          # 严格 SemVer 是 stable,其余 v* 是 canary(标 prerelease,latest 恒指 stable)。
+          prerelease: ${{ steps.type.outputs.prerelease }}

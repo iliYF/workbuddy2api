@@ -164,6 +164,7 @@ func (h *Handler) healthz(w http.ResponseWriter, r *http.Request) {
 		"total":          total,
 		"service":        ServiceName,
 		"realm_servable": realmServable,
+		"version":        version,
 	})
 }
 
