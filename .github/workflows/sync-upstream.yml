@@ -80,5 +80,5 @@ jobs:
       - name: Sync check
         if: failure()
         run: |
-          echo "::error::上游合并失败(可能上游 workflow 变更触发 GitHub 暂停了定时触发)。请手动 Sync fork 一次,或在本仓库 Actions 重跑本 workflow。"
+          echo "::error::同步失败。常见原因:GH_PAT 缺 workflow scope(上游改动 workflow 文件)、合并冲突。详见上方日志。"
           exit 1
