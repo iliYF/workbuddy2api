@@ -1,15 +1,13 @@
-# sync-upstream.yml — 定时把上游 Sliverkiss/workbuddy2api 的 master 合并进本 fork,
-# 把上游 tag 镜像到 fork(同名、指向同一上游 commit),并按提交类型自动切 canary。
-# 渠道:
-#   stable  上游 tag 镜像后触发 release.yml(v*)
-#   canary  本步骤用 PAT 推送 v<时间戳>-<7位sha> tag 触发 release.yml
-#   (GITHUB_TOKEN 推送不会触发 workflow,须用 PAT 密钥 GH_PAT 才能全自动)
+# sync-upstream.yml — 定时把上游 Sliverkiss/workbuddy2api 的 master 合并进本 fork。
+# 只同步 master 分支,不再镜像上游 tag:GITHUB_TOKEN 缺 workflows 权限,推含
+# workflow 变更的 tag(如上游 v1.0.0)会被 GitHub 拒绝并拖垮整条流水线。
+# 可选 canary:配置 secrets.GH_PAT 后按提交类型自动切 v<时间戳>-<7位sha> tag 触发 release.yml。
 name: Sync Upstream
 
 on:
   schedule:
-    # 每天 UTC 03:17(北京 11:17),错开整点高峰(上游 build.yml 实测整点排队会被静默丢弃)。
-    - cron: "17 3 * * *"
+    # 每天 UTC 21:20(北京次日 05:20),错开整点高峰(上游 build.yml 实测整点排队会被静默丢弃)。
+    - cron: "20 21 * * *"
   workflow_dispatch:
 
 permissions:
@@ -32,23 +30,6 @@ jobs:
           upstream_sync_branch: master
           target_sync_branch: master
           target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Mirror upstream tags
-        env:
-          RELEASE_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote remove upstream 2>/dev/null || true
-          git remote add upstream https://github.com/Sliverkiss/workbuddy2api.git
-          git fetch upstream --tags
-          # GITHUB_TOKEN 推送的 tag 不会触发 release.yml(防递归),须用 PAT 才能自动构建 stable。
-          if [ -n "${RELEASE_PAT:-}" ]; then
-            git push "https://x-access-token:${RELEASE_PAT}@github.com/${GITHUB_REPOSITORY}.git" --tags
-          else
-            git push --tags origin
-            echo "::warning::未配置 GH_PAT,镜像 tag 只复制不触发 stable 构建"
-          fi
 
       - name: Auto-cut canary (PAT)
         env:
