@@ -1,6 +1,7 @@
 # sync-upstream.yml — 定时把上游 Sliverkiss/workbuddy2api 的 master 合并进本 fork。
-# 只同步 master 分支,不再镜像上游 tag:GITHUB_TOKEN 缺 workflows 权限,推含
-# workflow 变更的 tag(如上游 v1.0.0)会被 GitHub 拒绝并拖垮整条流水线。
+# 只同步 master 分支,不再镜像上游 tag(要发 stable 就手动打 tag)。
+# GITHUB_TOKEN 必须带 workflows: write:上游提交若改动 .github/workflows/*,
+# master 推送没有该权限会被 GitHub 拒绝(实测 ai-governance.yml 变更即触发)。
 # 可选 canary:配置 secrets.GH_PAT 后按提交类型自动切 v<时间戳>-<7位sha> tag 触发 release.yml。
 name: Sync Upstream
 
@@ -12,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  workflows: write
 
 jobs:
   sync:
