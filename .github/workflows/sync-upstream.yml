@@ -1,7 +1,8 @@
 # sync-upstream.yml — 定时把上游 Sliverkiss/workbuddy2api 的 master 合并进本 fork。
 # 只同步 master 分支,不再镜像上游 tag(要发 stable 就手动打 tag)。
-# fork-sync 用 secrets.GH_PAT 推送(须带 repo + workflow scope):上游提交若改动
-# .github/workflows/*(实测 ai-governance.yml 变更即触发),GITHUB_TOKEN 推送会被拒。
+# 直接用 git 合并上游并用 secrets.GH_PAT 推送(须带 repo + workflow scope):
+# 上游提交若改动 .github/workflows/*(实测 ai-governance.yml 变更即触发),
+# GITHUB_TOKEN 推送会被 GitHub 以"GitHub App 无 workflows 权限"拒绝。
 # 可选 canary:配置 secrets.GH_PAT 后按提交类型自动切 v<时间戳>-<7位sha> tag 触发 release.yml。
 name: Sync Upstream
 
@@ -23,14 +24,26 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Sync upstream changes
-        id: sync
-        uses: aormsby/fork-sync-with-upstream-action@v3.4.3
-        with:
-          upstream_sync_repo: Sliverkiss/workbuddy2api
-          upstream_sync_branch: master
-          target_sync_branch: master
-          target_repo_token: ${{ secrets.GH_PAT }}
+      - name: Sync upstream master
+        env:
+          SYNC_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          set -eu
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote remove upstream 2>/dev/null || true
+          git remote add upstream https://github.com/Sliverkiss/workbuddy2api.git
+          git fetch upstream master
+          if git merge-base --is-ancestor upstream/master HEAD; then
+            echo "==> 上游 master 无新提交,无需同步"
+            exit 0
+          fi
+          if [ -z "${SYNC_PAT:-}" ]; then
+            echo "::error::secrets.GH_PAT 为空,无法推送(上游可能改动 workflow 文件)"
+            exit 1
+          fi
+          git merge --no-edit upstream/master
+          git push "https://x-access-token:${SYNC_PAT}@github.com/${GITHUB_REPOSITORY}.git" HEAD:master
 
       - name: Auto-cut canary (PAT)
         env:
