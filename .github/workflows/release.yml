@@ -88,5 +88,24 @@ jobs:
         with:
           files: artifacts/*
           generate_release_notes: true
+          body: |
+            ## wb2api ${{ github.ref_name }}
+
+            CodeBuddy 账号的 OpenAI 兼容 API 的自托管网关。
+            
+            跨平台编译产物:
+            darwin-arm64 / darwin-amd64 / windows-amd64(.exe) / linux-amd64 / linux-arm64。
+
+            ### 安装
+            从下方 Assets 下载对应平台文件,替换旧二进制后重启即可。
+
+            ### 校验
+            下载 SHA256SUMS 后核对:
+            - macOS:`shasum -a 256 -c SHA256SUMS`
+            - Linux:`sha256sum -c SHA256SUMS`
+            - Windows:`certutil -hashfile <文件> SHA256`
+
+            ### 说明
+            严格 SemVer(v1.2.3)为 stable;带时间戳(v202609192001-a767465)为 canary 预览版。
           # 严格 SemVer 是 stable,其余 v* 是 canary(标 prerelease,latest 恒指 stable)。
           prerelease: ${{ steps.type.outputs.prerelease }}
